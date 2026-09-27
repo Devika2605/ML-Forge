@@ -75,7 +75,7 @@ cd ..
 ```
 cd backend
 ./setup.sh      # creates venv, installs deps, generates datasets, precomputes ML results
-./run.sh or uvicorn app.main:app --reload --port 8000       # starts the API on http://localhost:8000 — also serves the built frontend
+./run.sh or uvicorn app.main:app --reload --port 8000  # starts the API on http://localhost:8000 — also serves the built frontend
 ```
 
 Open **http://localhost:8000** — that's the whole app.
