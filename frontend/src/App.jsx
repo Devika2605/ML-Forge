@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/mission/:roomKey/:teamName" element={<Mission />} />
             {/* Not linked in the nav on purpose — only reachable by typing
                 the URL directly, so participants don't see it. */}
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/1235/admin" element={<Admin />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
           </Routes>
         </div>
