@@ -5,10 +5,10 @@
 // which is why the fallback here is "" and not localhost.
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-async function request(method, path, body) {
+async function request(method, path, body, extraHeaders = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : {},
+    headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...extraHeaders },
     body: body ? JSON.stringify(body) : undefined,
   });
   let data = null;
@@ -172,6 +172,11 @@ export const api = {
   adminWinner: (roomKey) => request("GET", `/api/admin/${roomKey}/winner`),
   adminLiveView: (roomKey) => request("GET", `/api/admin/${roomKey}/live-view`),
   adminTabSwitches: (roomKey) => request("GET", `/api/admin/${roomKey}/tab-switches`),
+  // team password tools — require the organizer's admin key
+  adminListTeams: (roomKey, adminKey) =>
+    request("GET", `/api/admin/${roomKey}/teams`, undefined, { "X-Admin-Key": adminKey }),
+  adminResetPassword: (roomKey, teamId, adminKey) =>
+    request("POST", `/api/admin/${roomKey}/teams/${teamId}/reset-password`, undefined, { "X-Admin-Key": adminKey }),
   adminReportUrl: (roomKey, roundNumber) => `${API_BASE}/api/admin/${roomKey}/report/${roundNumber}`,
 };
 

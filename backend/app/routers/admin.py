@@ -1,15 +1,29 @@
 import csv
 import io
+import os
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from sqlalchemy.orm import Session
 
-from .. import models, schemas, core
+from .. import models, schemas, core, security
 from ..database import get_db
 from ..content import DATASETS
 from ..scoring import score_round1, score_round2
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# Team-password tools are the one part of admin that can hand out access to a
+# team's account, so unlike the rest of this router they require a key.
+# Set ADMIN_KEY in the backend environment; the fallback below is only so it
+# works out of the box — change it before a real event.
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "changeme-admin")
+
+
+def require_admin_key(x_admin_key: str = Header(default="")):
+    if not secrets.compare_digest(x_admin_key.encode(), ADMIN_KEY.encode()):
+        raise HTTPException(403, "Wrong or missing admin key.")
 
 
 def _log(db: Session, room: models.Room, action: str, detail=None):
@@ -344,3 +358,40 @@ def live_view(room_key: str, db: Session = Depends(get_db)):
         "round2_time_remaining": core.time_remaining_seconds(room, 2),
         "round2_twist_released": core.is_twist_released(room, 2),
     }
+
+
+@router.get("/{room_key}/teams", dependencies=[Depends(require_admin_key)])
+def list_teams(room_key: str, db: Session = Depends(get_db)):
+    """Who is registered, for the password-reset panel. Never returns any
+    password data — only whether one has been set."""
+    room = core.get_room_or_404(db, room_key)
+    teams = db.query(models.Team).filter(models.Team.room_id == room.id).order_by(models.Team.name).all()
+    return [
+        {
+            "team_id": t.id,
+            "team_name": t.name,
+            "team_code": t.team_code,
+            "has_password": bool(t.password_hash),
+            "qualified_round2": t.qualified_round2,
+            "last_seen_at": t.last_seen_at,
+        }
+        for t in teams
+    ]
+
+
+@router.post("/{room_key}/teams/{team_id}/reset-password", dependencies=[Depends(require_admin_key)])
+def reset_team_password(room_key: str, team_id: int, db: Session = Depends(get_db)):
+    """For a team that forgot its password: issues a temporary one, shown to
+    the organizer exactly once. The old password is never stored or shown
+    (only a hash is kept), so it can't be recovered — only replaced. Existing
+    sessions are signed out."""
+    room = core.get_room_or_404(db, room_key)
+    team = db.query(models.Team).filter(models.Team.id == team_id, models.Team.room_id == room.id).first()
+    if not team:
+        raise HTTPException(404, "Team not found in this room")
+    temp = security.new_temp_password()
+    team.password_hash, team.password_salt = security.make_password_hash(temp)
+    team.token = None
+    db.commit()
+    _log(db, room, "RESET_PASSWORD", {"team_name": team.name})
+    return {"team_name": team.name, "temporary_password": temp}

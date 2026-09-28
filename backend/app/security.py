@@ -41,3 +41,12 @@ def new_team_code() -> str:
     """Short, human-shareable public ID, distinct from the free-text team
     name — teams can quote this to organizers without spelling out names."""
     return "MLF-" + "".join(secrets.choice(_CODE_ALPHABET) for _ in range(6))
+
+
+# No 0/O/1/I/L so a temporary password read aloud or off a screen isn't misread.
+_TEMP_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_temp_password() -> str:
+    """Readable one-time password an organizer hands to a team that forgot theirs."""
+    return "".join(secrets.choice(_TEMP_ALPHABET) for _ in range(8))

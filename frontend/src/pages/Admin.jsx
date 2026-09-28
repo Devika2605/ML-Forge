@@ -15,6 +15,9 @@ export default function Admin() {
   const [liveView, setLiveView] = useState(null);
   const [tabSwitches, setTabSwitches] = useState(null);
   const [winner, setWinner] = useState(null);
+  const [adminKey, setAdminKey] = useState("");
+  const [teams, setTeams] = useState(null);
+  const [resetResult, setResetResult] = useState(null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -52,6 +55,23 @@ export default function Admin() {
     } catch (e) {
       setErr(e.message);
     }
+  }
+
+  async function loadTeams(clearResult = true) {
+    setErr("");
+    if (clearResult) setResetResult(null);
+    try {
+      setTeams(await api.adminListTeams(roomKey, adminKey));
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function resetPassword(team) {
+    if (!window.confirm(`Reset the password for "${team.team_name}"? Their current password stops working and they'll be signed out.`)) return;
+    setErr(""); setResetResult(null);
+    try {
+      setResetResult(await api.adminResetPassword(roomKey, team.team_id, adminKey));
+      await loadTeams(false); // keep the temporary password visible after refreshing the list
+    } catch (e) { setErr(e.message); }
   }
 
   return (
@@ -127,6 +147,33 @@ export default function Admin() {
             ) : (
               <p className="help-text">No tab switches logged yet.</p>
             )}
+          </div>
+
+          <div className="panel">
+            <div className="panel-title">Team Access (forgotten passwords)</div>
+            <p className="help-text" style={{ marginTop: -6, marginBottom: 12 }}>
+              Passwords are stored hashed, so an old one can't be looked up — if a team
+              forgets theirs, reset it here and give them the temporary one shown below.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+              <input type="password" placeholder="Admin key" value={adminKey} onChange={(e) => setAdminKey(e.target.value)} />
+              <button className="btn" onClick={() => loadTeams()}>Load Teams</button>
+            </div>
+            {resetResult && (
+              <div className="success-box">
+                New temporary password for <strong>{resetResult.team_name}</strong>:{" "}
+                <strong style={{ letterSpacing: 2 }}>{resetResult.temporary_password}</strong>
+                {" "}— shown only once. Tell the team to log in with it.
+              </div>
+            )}
+            {teams && teams.map((t) => (
+              <div key={t.team_id} className="leaderboard-row" style={{ gridTemplateColumns: "1fr 130px 90px 140px" }}>
+                <div>{t.team_name}{t.qualified_round2 && <span className="badge green" style={{ marginLeft: 6 }}>R2</span>}</div>
+                <div>{t.team_code || "—"}</div>
+                <div>{t.has_password ? "Set" : "Not set"}</div>
+                <div><button className="btn" onClick={() => resetPassword(t)}>Reset password</button></div>
+              </div>
+            ))}
           </div>
 
           <div className="panel">
